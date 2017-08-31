@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use Log;
+
+use App\Jobs\SendSms;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Api\BaseController;
+use App\User;
+use App\Models\Des;
+use App\Models\Sms;
+use App\Models\SmsRecord;
+
+class AccountsController extends BaseController
+{
+	const RET_CODE_SUCCESS = 0;
+	const RET_CODE_FAIL = -99;
+	const MSG_SUCCESS = "操作成功";
+	const MSG_FAIL = "操作失败";
+
+	public function verify_code(Request $request)
+	{
+		Log::info($request->all());
+		$phone = $request->get("phone");
+		$code = rand(1000,9999);
+		$sms_record = SmsRecord::where("phone",$phone)->orderby("id","desc")->first();
+
+		//判断存在
+		//判断是否过期
+		$current = date('Y-m-d H:i:s',time());
+		if ($sms_record  ) {
+			$old = date('Y-m-d H:i:s',strtotime($sms_record->created_at)+60);
+			if ($current < $old) {
+				return response()->json(["ret" =>self::RET_CODE_FAIL,"msg"=>self::MSG_FAIL."已经发送","data" => $sms_record->code]);
+			}
+		}
+		//发送短信 并记录
+		dispatch(new SendSms($phone,[$code,1],"66857"));
+		return response()->json(["ret" =>self::RET_CODE_SUCCESS ,"msg"=>self::MSG_SUCCESS,"data" => $code]);
+	}
+
+	public function login(Request $request)
+	{
+
+		$phone = $request->get("phone");
+		$code = $request->get("code");
+		$token = $request->get("aliyuntoken");
+		$user = User::where("FLOGIN",$phone)->first();
+
+		$current = date('Y-m-d H:i:s',time());
+		$sms_record = SmsRecord::where("phone",$phone)->orderby("id","desc")->first();
+
+		//创建用户
+		if($sms_record  ){
+			$old = date('Y-m-d H:i:s',strtotime($sms_record->created_at)+60);
+			if($current < $old && $code == $sms_record->code){
+				if($user){
+					$data['FLASTLOGINDATE'] = $current;
+					$data['FALIYUNTOKEN'] = $token;
+					if ($request->get("token")) {
+						$data['FALIYUNTOKEN'] = $request->get("token");
+					}
+
+					if ($request->get("pushToken")) {
+						$data['FIOSTOKEN'] = $request->get("pushToken");
+					}
+					User::where("FID",$user->FID)->update($data);
+					$flag = 0;
+					if ($user->FNAME) {
+						$flag = 1;
+					}
+					return response()->json(["ret" => self::RET_CODE_SUCCESS,"flag" => $flag,"msg"=>self::MSG_SUCCESS,"user"=>self::userData($user)]);
+				}
+				$user = new User;
+				$user->FID = User::max("FID")+1;
+				$user->FLOGIN  = $phone;
+				$user->FPHONE = $phone;
+				$user->FCODE =  $phone;
+				$user->FNEWDATE  = $current;
+				$user->FEDITDATE  = $current;
+				$user->FALIYUNTOKEN = $token;
+				if ($request->get("token")) {
+						$user->FALIYUNTOKEN = $request->get("token");
+					}
+
+					if ($request->get("pushToken")) {
+						$user->FIOSTOKEN = $request->get("pushToken");
+					}
+				$user->save();
+					
+				return response()->json(["ret" => self::RET_CODE_SUCCESS,"flag" => 0 ,"msg"=>self::MSG_SUCCESS,"user" =>self::userData($user)]);
+			}
+		}
+
+		return response()->json(["ret" => self::RET_CODE_FAIL,"msg"=>self::MSG_FAIL ]);
+	}
+
+	public static function userData($user)
+	{
+		$userdata["userToken"] = Des::userToken($user->FID);
+		$userdata["userId"] = $user->FID;
+		$userdata["pic"] = $user->FPIC;
+		$userdata["name"] = $user->FNAME;
+		$userdata["loginAccount"] = $user->FLOGIN;
+		$userdata["sex"] = $user->FSEX;
+		$userdata["constellation"] = $user->FCONSTELLATION;
+		$userdata["bloodType"] = $user->FBLOODTYPE;
+		$userdata["mobile"] = $user->FPHONE;
+		return $userdata;
+	}
+
+	public function update(Request $request)
+	{
+
+		$current = date('Y-m-d H:i:s',time());
+		if($request->get("name")){
+			$data['FNAME'] = $request->get("name");
+		}
+		if ($request->get("sex")) {
+			$data['FSEX'] = $request->get("sex");
+		}
+		$token = $request->get("aliyuntoken");
+		if ($token) {
+			$data['FALIYUNTOKEN'] = $token;
+		}
+		if ($request->get("token")) {
+			$data['FALIYUNTOKEN'] = $request->get("token");
+		}
+
+		if ($request->get("pushToken")) {
+			$data['FIOSTOKEN'] = $request->get("pushToken");
+		}
+		
+		$user = User::where("FID",$request->get("user_id"));
+		if ($user) {
+			$data['FEDITDATE'] = $current;
+			$user->update($data);
+
+			return response()->json(["ret" => self::RET_CODE_SUCCESS,"msg"=>self::MSG_SUCCESS]);
+		}
+		
+		return response()->json(["ret" => self::RET_CODE_FAIL,"msg"=>self::MSG_FAIL ]);
+
+	}
+
+
+
+}
+

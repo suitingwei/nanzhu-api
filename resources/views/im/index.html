@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0" />
+<link rel="shortcut icon" href="/assets/manage/assets/favicon.ico" />
+<title>南竹通告单+</title>
+<style>
+.webim-logo img {
+    max-width: 100%;
+    height: auto;
+}
+.webim-sign h2 {
+    font-weight: 100;
+}
+.webim-checkbox, .webim-sign p, #chatrooms, #strangers {
+    display: none;
+}
+.webim-sign .bg-color {
+    border-color: #54b99f;
+    background-color: #54b99f;
+}
+.webim-dialog .webim-button, .webim-send-wrapper .webim-button {
+    margin: 10px auto;
+}
+.webim-dialog .webim-button {
+    font-size: 16px;
+}
+.webim-send-wrapper .webim-button {
+    font-size: 12px;
+}
+.webim-msg-container .left .webim-msg-value > pre {
+	color: #000;
+}
+</style>
+<!--sdk-->
+<script src='sdk/dist/strophe.js'></script>
+<script src='sdk/dist/websdk-1.1.2.js'></script>
+
+<!--config-->
+<script src="demo/javascript/dist/webim.config.js"></script>
+
+<!--[if lte IE 9]>
+<script src="demo/javascript/dist/low/html5shiv.js"></script>
+<script src="demo/javascript/dist/low/respond.min.js"></script>
+<script src="demo/javascript/dist/swfupload/swfupload.min.js"></script>
+<![endif]-->
+<script src="demo/javascript/dist/low/modernizr.custom.min.js"></script>
+</head>
+<body>
+
+<section id='main' class='w100'>
+    <article id='demo'></article>
+    <article id='components'></article>
+</section>
+
+<!--demo javascript-->
+<script src="demo/javascript/dist/demo.js"></script>
+<script src="demo/javascript/dist/low/jquery-1.11.3.min.js"></script>
+<script src="demo/javascript/dist/low/jquery.cookie.js"></script>
+<script src="demo/javascript/dist/low/jquery.placeholder.min.js"></script>
+<script>
+jQuery(document).ready(function ($) {
+
+    //兼容ie placeholder
+    $('input, textarea').placeholder();
+
+    /*防刷新：检测是否存在cookie*/
+    if($.cookie("captcha")){
+        var count = $.cookie("captcha");
+        var btn = $('.mob-code input');
+        btn.val("重新获取(" + count + ")").attr('disabled',true).css('cursor','not-allowed');
+        var resend = setInterval(function(){
+            count--;
+            if (count > 0){
+                btn.val("重新获取(" + count + ")").attr('disabled',true).css('cursor','not-allowed');
+                $.cookie("captcha", count, {path: '/', expires: (1/86400)*count});
+            }else {
+                clearInterval(resend);
+                btn.val("获取验证码").removeClass('disabled').removeAttr('disabled style');
+            }
+        }, 1000);
+    }
+
+    /*发送短信验证*/
+    $('.mob-code input').click(function(){
+
+        var phonenum = $(".div-phone input").val();
+        var myreg = /^(((13[0-9]{1})|(15[0-9]{1})|(18[0-9]{1}))+\d{8})$/;
+        if(!myreg.test(phonenum)){
+            $('.div-phone').append('<div class="tips">请输入有效的手机号码！</div>');
+            return false;
+        }
+
+        if(myreg.test(phonenum)){
+
+            //检测手机正确隐藏提示
+            $('.div-phone .tips').remove();
+
+            var btn = $(this);
+            var count = 60;
+            var resend = setInterval(function(){
+                count--;
+                if (count > 0){
+                    btn.val("重新获取(" + count + ")");
+                    $.cookie("captcha", count, {path: '/', expires: (1/86400)*count});
+                }else {
+                    clearInterval(resend);
+                    btn.val("获取验证码").removeAttr('disabled style');
+                }
+            }, 1000);
+            btn.attr('disabled',true).css('cursor','not-allowed');
+
+            //获取短信接口
+            //$.get( "/api/account/verify_code?phone="+phonenum, function( data ) {
+            //  alert(data.msg);
+            // });
+        }
+    });
+
+});
+</script>
+</body>
+</html>
